@@ -1,0 +1,99 @@
+import { useState, useEffect } from "react";
+import "./App.css";
+
+const CATEGORIES = ["Food", "Travel", "Study", "Other"];
+
+function load(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export default function App() {
+  const [budget, setBudget] = useState(() => load("budget", 5000));
+  const [expenses, setExpenses] = useState(() => load("expenses", []));
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("budget", JSON.stringify(budget));
+      localStorage.setItem("expenses", JSON.stringify(expenses));
+    } catch {}
+  }, [budget, expenses]);
+
+  const spent = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const left = budget - spent;
+  const percent = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 100;
+  const level = spent > budget ? "over" : percent >= 80 ? "warn" : "ok";
+
+  const addExpense = (e) => {
+    e.preventDefault();
+    const value = parseFloat(amount);
+    if (!title.trim() || !(value > 0)) {
+      setError("Enter an expense name and an amount greater than 0.");
+      return;
+    }
+    setError("");
+    setExpenses([{ id: Date.now(), title: title.trim(), amount: value, category }, ...expenses]);
+    setTitle("");
+    setAmount("");
+  };
+
+  const remove = (id) => setExpenses(expenses.filter((x) => x.id !== id));
+
+  return (
+    <main>
+      <h1>Student Expense Tracker</h1>
+      <p className="sub">Track your monthly spending and stay within budget.</p>
+
+      <div className="field">
+        <label htmlFor="budget">Monthly budget (₹)</label>
+        <input id="budget" type="number" min="0" value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
+      </div>
+
+      <div className="cards">
+        <div className="card"><span>Budget</span><b>₹{budget}</b></div>
+        <div className="card"><span>Spent</span><b>₹{spent}</b></div>
+        <div className={`card ${left < 0 ? "neg" : ""}`}><span>Left</span><b>₹{left}</b></div>
+      </div>
+
+      <div className="bar"><div className={`fill ${level}`} style={{ width: `${percent}%` }} /></div>
+      <p className={`msg ${level}`}>
+        {level === "over" && "Over budget! Stop spending on non-essentials."}
+        {level === "warn" && "Warning: you have used " + percent + "% of your budget."}
+        {level === "ok" && "You are within budget. Used " + percent + "%."}
+      </p>
+
+      <form onSubmit={addExpense} noValidate>
+        <h2>Add expense</h2>
+        <input type="text" placeholder="What did you spend on?" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <div className="two">
+          <input type="number" min="0" placeholder="Amount (₹)" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <p className="err" role="alert">{error}</p>
+        <button className="add" type="submit">Add expense</button>
+      </form>
+
+      <h2>Expenses</h2>
+      {expenses.length === 0 && <p className="empty">No expenses yet.</p>}
+      <ul>
+        {expenses.map((x) => (
+          <li key={x.id}>
+            <div><b>{x.title}</b><small>{x.category}</small></div>
+            <span>₹{x.amount}</span>
+            <button className="del" onClick={() => remove(x.id)} aria-label={`Delete ${x.title}`}>×</button>
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}
